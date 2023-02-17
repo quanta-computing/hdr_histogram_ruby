@@ -18,15 +18,15 @@ static void histogram_free(void *p) {
 static VALUE histogram_new(int argc, VALUE* argv, VALUE class) {
   VALUE                    self, lowest_value, highest_value, significant_figures;
   VALUE                    opt;
-  
+
   struct hdr_histogram    *hdrh;
   int                      ret;
-  
+
   rb_scan_args(argc, argv, "31", &lowest_value, &highest_value, &significant_figures, &opt);
-  
+
   lowest_value = rb_funcall(class, rb_intern("adjusted_boundary_val"), 2, lowest_value, opt);
   highest_value = rb_funcall(class, rb_intern("adjusted_boundary_val"), 2, highest_value, opt);
-  
+
   ret = hdr_init(NUM2INT(lowest_value), NUM2INT(highest_value), NUM2INT(significant_figures), &hdrh);
   if(ret == EINVAL) {
     rb_raise(HDRHistogramError, "%s", "lowest_trackable_value must be >= 1");
@@ -34,10 +34,10 @@ static VALUE histogram_new(int argc, VALUE* argv, VALUE class) {
   else if(ret == ENOMEM) {
     rb_raise(HDRHistogramError, "%s", "no memory");
   }
-  
+
   self = Data_Wrap_Struct(class, NULL, histogram_free, hdrh);
   rb_obj_call_init(self, argc, argv);
-  
+
   return self;
 }
 
@@ -57,7 +57,7 @@ static VALUE histogram_clone(VALUE self_src) {
     rb_raise(HDRHistogramError, "%s", "bad hdrhistogram ccopy");
   }
   self = Data_Wrap_Struct(HDRHistogram, NULL, histogram_free, hdrh);
-  
+
   hdrh->lowest_trackable_value = hdr_src->lowest_trackable_value;
   hdrh->highest_trackable_value = hdr_src->highest_trackable_value;
   hdrh->unit_magnitude = hdr_src->unit_magnitude;
@@ -73,25 +73,25 @@ static VALUE histogram_clone(VALUE self_src) {
   hdrh->conversion_ratio = hdr_src->conversion_ratio;
   hdrh->counts_len = hdr_src->counts_len;
   hdrh->total_count = hdr_src->total_count;
-  
+
   for(i=0; i<hdrh->counts_len; i++) {
     hdrh->counts[i] = hdr_src->counts[i];
   }
-  
+
   VALUE lowest = INT2NUM(hdr_src->lowest_trackable_value);
   VALUE highest = INT2NUM(hdr_src->highest_trackable_value);
   VALUE sig = INT2NUM(hdr_src->significant_figures);
   VALUE opt = rb_hash_new();
   rb_hash_aset(opt, ID2SYM(rb_intern("multiplier")), rb_iv_get(self_src, "@multiplier"));
   rb_hash_aset(opt, ID2SYM(rb_intern("unit")), rb_iv_get(self_src, "@unit"));
-  
+
   VALUE argv[4];
   VALUE argc = 4;
   argv[0]=lowest;
   argv[1]=highest;
   argv[2]=sig;
   argv[3]=opt;
-  
+
   rb_obj_call_init(self, argc, argv);
   return self;
 }
@@ -214,18 +214,20 @@ static VALUE histogram_get_raw_count(VALUE self, VALUE index) {
 void Init_ruby_hdr_histogram() {
   HDRHistogram = rb_define_class("HDRHistogram", rb_cObject);
   HDRHistogramError = rb_define_class_under(HDRHistogram, "HDRHistogramError", rb_eRuntimeError);
-  
+
+  rb_undef_alloc_func(HDRHistogram);
+
   rb_define_singleton_method(HDRHistogram, "new", histogram_new, -1);
   rb_define_attr(HDRHistogram, "multiplier", 1, 0);
   rb_define_attr(HDRHistogram, "unit", 1, 0);
-  
+
   rb_define_method(HDRHistogram, "reset", histogram_reset, 0);
   rb_define_method(HDRHistogram, "memsize", histogram_memsize, 0);
   rb_define_method(HDRHistogram, "count", histogram_count, 0);
-  
+
   rb_define_method(HDRHistogram, "clone", histogram_clone, 0);
   rb_define_method(HDRHistogram, "dup", histogram_clone, 0);
-  
+
   rb_define_private_method(HDRHistogram, "raw_record", histogram_record_value, 1);
   rb_define_private_method(HDRHistogram, "raw_record_corrected", histogram_record_corrected_value, 2);
   rb_define_private_method(HDRHistogram, "raw_min", histogram_min, 0);
@@ -234,7 +236,7 @@ void Init_ruby_hdr_histogram() {
   rb_define_private_method(HDRHistogram, "raw_stddev", histogram_stddev, 0);
   rb_define_private_method(HDRHistogram, "raw_percentile", histogram_percentile, 1);
   rb_define_private_method(HDRHistogram, "raw_merge", histogram_merge, 1);
-  
+
   HISTOGRAM_RUBY_PRIVATE_GETSETTERS(lowest_trackable_value);
   HISTOGRAM_RUBY_PRIVATE_GETSETTERS(highest_trackable_value);
   HISTOGRAM_RUBY_PRIVATE_GETSETTERS(unit_magnitude);
@@ -250,8 +252,7 @@ void Init_ruby_hdr_histogram() {
   HISTOGRAM_RUBY_PRIVATE_GETSETTERS(conversion_ratio);
   HISTOGRAM_RUBY_PRIVATE_GETSETTERS(counts_len);
   HISTOGRAM_RUBY_PRIVATE_GETSETTERS(total_count);
-  
+
   rb_define_private_method(HDRHistogram, "set_raw_count", histogram_set_raw_count, 2);
   rb_define_private_method(HDRHistogram, "get_raw_count", histogram_get_raw_count, 1);
 }
-
