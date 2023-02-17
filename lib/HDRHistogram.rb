@@ -5,7 +5,7 @@ class HDRHistogram
   def initialize(lowest, highest, sig, opt={})
     @multiplier = opt[:multiplier] || 1
     @unit = opt[:unit] || opt[:units]
-    
+
     if opt[:unserialized]
       m=opt[:unserialized]
       self.unit_magnitude= m[:unit_magnitude].to_i
@@ -27,7 +27,7 @@ class HDRHistogram
       if !@unit && m[:unit]
         @unit = m[:unit]
       end
-      
+
       counts = m[:counts].split " "
       i=0
       shorted = 0
@@ -73,7 +73,7 @@ class HDRHistogram
     raw_percentile(pct) * @multiplier
   end
   def merge!(other)
-    if self == other 
+    if self == other
       raise HDRHistogramError, "can't merge histogram with itself"
     end
     if other.multiplier != multiplier
@@ -85,17 +85,17 @@ class HDRHistogram
     raw_merge other
     self
   end
-  
+
   def to_s
     stats
   end
-  
+
   def latency_stats
     str = "Latency Stats\n"
     str << stats([ 50.0, 75.0, 90.0, 99.0, 99.9, 99.99, 99.999, 100.0 ])
-    
+
   end
-  
+
   def stats(percentiles = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100])
     str = ""
     pctf = @multiplier < 1 ? "%12.#{Math.log(0.001, 10).abs.ceil}f" : "%12u"
@@ -104,19 +104,19 @@ class HDRHistogram
     end
     str
   end
-  
+
   def serialize
     attrs = [lowest_trackable_value, highest_trackable_value, unit_magnitude, significant_figures, sub_bucket_half_count_magnitude, sub_bucket_half_count, sub_bucket_mask, sub_bucket_count, bucket_count, min_value, max_value, normalizing_index_offset, ("%f" % conversion_ratio), counts_len, total_count]
-    
+
     raw_counts = []
     numrun="~!@#$%^&*"
-    
+
     for i in 0...counts_len do
       raw_counts << get_raw_count(i)
     end
-    
+
     counts = []
-    
+
     while raw_counts.length > 0 do
       num = raw_counts.shift
       n = 1
@@ -134,33 +134,34 @@ class HDRHistogram
         counts << num
       end
     end
-    
+
     out = "#{attrs.join " "} [#{counts.join " "} ]"
     if @unit || @multiplier != 1
       out << " (#{unit} #{multiplier})"
     end
     out
   end
-  
+
   def self.adjusted_boundary_val(val, opt={})
     return opt ? val * 1/(opt[:multiplier] || 1) : val
   end
   private_class_method :adjusted_boundary_val
-  
+
+
+  UNSERIALIZE_REGEX = /^(?<lowest_trackable_value>\d+) (?<highest_trackable_value>\d+) (?<unit_magnitude>\d+) (?<significant_figures>\d+) (?<sub_bucket_half_count_magnitude>\d+) (?<sub_bucket_half_count>\d+) (?<sub_bucket_mask>\d+) (?<sub_bucket_count>\d+) (?<bucket_count>\d+) (?<min_value>-?\d+) (?<max_value>\d+) (?<normalizing_index_offset>\d+) (?<conversion_ratio>\S+) (?<counts_len>\d+) (?<total_count>\d+) \[(?<counts>([~!@#$%^&*]?\d+ )+)\]( \((?<unit>.*) (?<multiplier>\S+)\))?/.freeze
+
   def self.unserialize(str, opt={})
-    regex = /^(?<lowest_trackable_value>\d+) (?<highest_trackable_value>\d+) (?<unit_magnitude>\d+) (?<significant_figures>\d+) (?<sub_bucket_half_count_magnitude>\d+) (?<sub_bucket_half_count>\d+) (?<sub_bucket_mask>\d+) (?<sub_bucket_count>\d+) (?<bucket_count>\d+) (?<min_value>-?\d+) (?<max_value>\d+) (?<normalizing_index_offset>\d+) (?<conversion_ratio>\S+) (?<counts_len>\d+) (?<total_count>\d+) \[(?<counts>([~!@#$%^&*]?\d+ )+)\]( \((?<unit>.*) (?<multiplier>\S+)\))?/
-    
-    m = str.match regex
-    
+    m = str.match UNSERIALIZE_REGEX
+
     raise HDRHistogramError, "invalid serialization pattern" if m.nil?
-    
+
     opt[:unserialized]=m
     multiplier = opt[:multiplier] || 1
-    
+
     low = m[:lowest_trackable_value].to_i * multiplier
     high = m[:highest_trackable_value].to_i * multiplier
     hdrh = self.new(low, high, m[:significant_figures].to_i, opt)
-    
+
     return hdrh
   end
 end
